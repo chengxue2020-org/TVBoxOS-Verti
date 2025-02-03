@@ -62,6 +62,7 @@ public class PlayingControlRightDialog extends DrawerPopupView {
         //倍速
         mBinding.speed0.setOnClickListener(view -> setSpeed(mBinding.speed0));
         mBinding.speed1.setOnClickListener(view -> setSpeed(mBinding.speed1));
+        mBinding.speed1a.setOnClickListener(view -> setSpeed(mBinding.speed1a));
         mBinding.speed2.setOnClickListener(view -> setSpeed(mBinding.speed2));
         mBinding.speed3.setOnClickListener(view -> setSpeed(mBinding.speed3));
         mBinding.speed4.setOnClickListener(view -> setSpeed(mBinding.speed4));

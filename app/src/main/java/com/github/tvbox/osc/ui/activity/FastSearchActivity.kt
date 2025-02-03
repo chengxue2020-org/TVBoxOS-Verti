@@ -1,6 +1,5 @@
 package com.github.tvbox.osc.ui.activity
 
-import android.content.DialogInterface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextUtils
@@ -14,48 +13,46 @@ import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.angcyo.tablayout.DslTabLayout
-import com.angcyo.tablayout.DslTabLayoutConfig
+import com.blankj.utilcode.util.GsonUtils
 import com.blankj.utilcode.util.KeyboardUtils
 import com.blankj.utilcode.util.LogUtils
+import com.blankj.utilcode.util.ScreenUtils
 import com.blankj.utilcode.util.ToastUtils
-import com.chad.library.adapter.base.BaseQuickAdapter
 import com.github.catvod.crawler.JsLoader
 import com.github.tvbox.osc.R
 import com.github.tvbox.osc.api.ApiConfig
 import com.github.tvbox.osc.base.BaseVbActivity
 import com.github.tvbox.osc.bean.AbsXml
+import com.github.tvbox.osc.bean.DoubanSuggestBean
 import com.github.tvbox.osc.bean.Movie
 import com.github.tvbox.osc.bean.SourceBean
 import com.github.tvbox.osc.databinding.ActivityFastSearchBinding
 import com.github.tvbox.osc.event.RefreshEvent
 import com.github.tvbox.osc.event.ServerEvent
 import com.github.tvbox.osc.ui.adapter.FastSearchAdapter
-import com.github.tvbox.osc.ui.adapter.SearchWordAdapter
+import com.github.tvbox.osc.ui.dialog.DoubanSuggestDialog
 import com.github.tvbox.osc.ui.dialog.SearchCheckboxDialog
 import com.github.tvbox.osc.ui.dialog.SearchSuggestionsDialog
-import com.github.tvbox.osc.ui.widget.LinearSpacingItemDecoration
 import com.github.tvbox.osc.util.FastClickCheckUtil
 import com.github.tvbox.osc.util.HawkConfig
 import com.github.tvbox.osc.util.SearchHelper
 import com.github.tvbox.osc.viewmodel.SourceViewModel
-import com.google.gson.Gson
-import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import com.google.gson.reflect.TypeToken
 import com.lxj.xpopup.XPopup
 import com.lxj.xpopup.core.BasePopupView
-import com.lxj.xpopup.interfaces.OnSelectListener
 import com.lxj.xpopup.interfaces.SimpleCallback
 import com.lzy.okgo.OkGo
 import com.lzy.okgo.callback.AbsCallback
+import com.lzy.okgo.callback.StringCallback
 import com.orhanobut.hawk.Hawk
 import com.zhy.view.flowlayout.FlowLayout
 import com.zhy.view.flowlayout.TagAdapter
 import okhttp3.Response
 import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
-import java.net.URLEncoder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
@@ -163,6 +160,17 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
                 bundle.putString("sourceKey", video.sourceKey)
                 jumpActivity(DetailActivity::class.java, bundle)
             }
+        }
+
+        searchAdapter.setOnItemLongClickListener { _, _, position ->
+            val video = searchAdapter.data[position]
+            getDoubanSuggest(video.name)
+            true
+        }
+        searchAdapterFilter.setOnItemLongClickListener { _, _, position ->
+            val video = searchAdapterFilter.data[position]
+            getDoubanSuggest(video.name)
+            true
         }
 
         setLoadSir(mBinding.llLayout)
@@ -586,5 +594,31 @@ class FastSearchActivity : BaseVbActivity<ActivityFastSearchBinding>(), TextWatc
         } else {
             getSuggest(text)
         }
+    }
+
+    private fun getDoubanSuggest(text: String) {
+        OkGo.get<String>("https://movie.douban.com/j/subject_suggest?q="+text.trim())
+            .execute(object : StringCallback(){
+                override fun onSuccess(response: com.lzy.okgo.model.Response<String>?) {
+                    val list = GsonUtils.fromJson<List<DoubanSuggestBean>>(
+                        response?.body(),
+                        object : TypeToken<List<DoubanSuggestBean>>() {}.type
+                    )
+
+                    //暂时只保留第一个,分数查询接口有限制
+                    val filterList = list.filter {
+                        it.title == text
+                    }
+                    if (filterList.isEmpty()){
+                        ToastUtils.showShort("暂无评分信息")
+                        return
+                    }
+
+                    XPopup.Builder(this@FastSearchActivity)
+                        .maxHeight(ScreenUtils.getScreenHeight() - (ScreenUtils.getScreenHeight() / 4))
+                        .asCustom(DoubanSuggestDialog(this@FastSearchActivity,filterList.subList(0,1)))
+                        .show()
+                }
+            })
     }
 }
